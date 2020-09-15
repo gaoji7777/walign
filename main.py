@@ -6,8 +6,8 @@ seed = 1
 torch.manual_seed(seed)
 import torch.nn.functional as F
 import torch_geometric
-from graphmodel import WDiscriminator, LGCN, GCNNet, GATNet, transformation, notrans
-from train import train_wgan_adv_pseudo_self, check_align, train_supervise_align, pred_anchor_links_from_embd
+from graphmodel import WDiscriminator, LGCN, GCNNet, GATNet, transformation, ReconDNN, notrans
+from train import train_wgan_adv_pseudo_self, check_align, train_supervise_align, pred_anchor_links_from_embd, train_feature_recon
 from preprocess import get_adj_list
 import time
 import argparse
@@ -21,6 +21,8 @@ parser.add_argument('--transformer', type=int, default=1)
 parser.add_argument('--prior_rate', type=float, default=0.02)
 parser.add_argument('--lr', type=float, default=0.001)
 parser.add_argument('--lr_wd', type=float, default=0.01)
+parser.add_argument('--lr_recon', type=float, default=0.01)
+parser.add_argument('--alpha', type=float, default=0.01)
 parser.add_argument('--hidden_size', type=int, default=512)
 parser.add_argument('--epochs', type=int, default=20)
 args = parser.parse_args()
@@ -94,6 +96,11 @@ with torch.no_grad():
 wdiscriminator = WDiscriminator(feature_output_size)
 optimizer_wd = torch.optim.Adam(wdiscriminator.parameters(), lr=args.lr_wd, weight_decay=5e-4)
 
+recon_model0 = ReconDNN(feature_output_size, feature_size)
+recon_model1 = ReconDNN(feature_output_size, feature_size)
+optimizer_recon0 = torch.optim.Adam(recon_model0.parameters(), lr=args.lr_recon, weight_decay=5e-4)
+optimizer_recon1 = torch.optim.Adam(recon_model1.parameters(), lr=args.lr_recon, weight_decay=5e-4)
+
 batch_size_align = 128
 
 best = 0
@@ -112,6 +119,9 @@ for i in range(1, args.epochs + 1):
 	elif args.setup==4:
 		loss = train_wgan_adv_pseudo_self(trans, optimizer_trans, wdiscriminator, optimizer_wd, networks)
 
+	loss_feature = train_feature_recon(trans, optimizer_trans, networks, [recon_model0, recon_model1], [optimizer_recon0, optimizer_recon1])
+	loss = (1-args.alpha) * loss + args.alpha * loss_feature
+	
 	loss.backward()
 	optimizer_trans.step()
 	
@@ -120,6 +130,7 @@ for i in range(1, args.epochs + 1):
 	trans.eval()
 	embd0 = networks[0][0](features[0], edges[0])
 	embd1 = networks[1][0](features[1], edges[1])
+
 	
 	with torch.no_grad():
 		a1, ak = check_align([embd0, trans(embd1)], ground_truth, mode=mode, prior=prior, prior_rate=prior_rate)

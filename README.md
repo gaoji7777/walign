@@ -1,5 +1,4 @@
-# walign
-Wasserstein Distance Graph Alignment
+# Wasserstein Distance Graph Alignment
 
 Run the code:
 

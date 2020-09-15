@@ -70,3 +70,11 @@ class notrans(torch.nn.Module):
 		super(notrans, self).__init__()
 	def forward(self, input_embd):
 		return input_embd
+
+class ReconDNN(torch.nn.Module):
+	def __init__(self, hidden_size, feature_size, hidden_size2=512):
+		super(ReconDNN, self).__init__()
+		self.hidden = torch.nn.Linear(hidden_size, hidden_size2)
+		self.output = torch.nn.Linear(hidden_size2, feature_size)
+	def forward(self, input_embd):
+		return self.output(F.relu(self.hidden(input_embd)))

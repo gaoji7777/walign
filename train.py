@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 import sklearn.neighbors
-from loss import pairwise_loss
+from loss import pairwise_loss, feature_reconstruct_loss
 
 def pred_anchor_links_from_embd(trans, networks, mode='cosine', prior=None, prior_rate=0):
 	models = [t[0] for t in networks]
@@ -151,7 +151,39 @@ def train_wgan_adv_pseudo_self( trans, optimizer_trans, wdiscriminator, optimize
 	embd1_anchor = embd1[anchor1, :]
 	loss = -torch.mean(wdiscriminator(embd1_anchor))
 	return loss
+
+
+def train_feature_recon(trans, optimizer_trans, networks, recon_models, optimizer_recons, batch_r_per_iter=10):
+	models = [t[0] for t in networks]
+	features = [t[2] for t in networks]
+	edges = [t[3] for t in networks]
+	recon_model0, recon_model1 = recon_models
+	optimizer_recon0, optimizer_recon1 = optimizer_recons
+	embd0 = models[0](features[0], edges[0])
+	embd1 = trans(models[1](features[1], edges[1]))
 	
+	recon_model0.train()
+	recon_model1.train()
+	trans.train()
+	models[0].train()
+	models[1].train()
+	embd0_copy = embd0.clone().detach()
+	embd1_copy = embd1.clone().detach()	
+	for t in range(batch_r_per_iter):
+		optimizer_recon0.zero_grad()
+		loss = feature_reconstruct_loss(embd0_copy, features[0], recon_model0)
+		loss.backward()
+		optimizer_recon0.step()
+	for t in range(batch_r_per_iter):
+		optimizer_recon1.zero_grad()
+		loss = feature_reconstruct_loss(embd1_copy, features[1], recon_model1)
+		loss.backward()
+		optimizer_recon1.step()
+	loss = 0.5 * feature_reconstruct_loss(embd0, features[0], recon_model0) + 0.5 * feature_reconstruct_loss(embd1, features[1], recon_model1)
+
+	return loss
+	
+		
 def check_align(embds, ground_truth, k=5, mode='cosine', prior=None, prior_rate=0):
 	embd0, embd1 = embds
 	g_map = {}
