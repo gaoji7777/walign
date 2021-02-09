@@ -6,8 +6,8 @@ Run the code:
 python main.py --dataset (dataset_name) --setup (sid) [--prior_rate 0.02 --use_config (True/False) ...]
 ```
 
---datasets ppi/douban/arena
-Currently supports three datasets: PPI, Douban, Arena Emails
+--datasets ppi/douban/arena/blogcatalog
+Currently supports four datasets: PPI, Douban, Arena Emails, BlogCatalog
 
 --setup 1/2/3/4
 1 - GCN+Pseudo
